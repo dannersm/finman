@@ -14,7 +14,7 @@ import {
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { es } from "date-fns/locale";
+import { es } from "date-fns/locale/es";
 import { BarChart, Label, Cached } from "@mui/icons-material";
 
 import TransactionList from "@/components/TransactionList";

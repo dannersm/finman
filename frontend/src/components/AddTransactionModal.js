@@ -15,7 +15,7 @@ import {
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { es } from 'date-fns/locale';
+import { es } from 'date-fns/locale/es';
 import { useAddTransaction } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 
