@@ -1,0 +1,49 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: finman-mongodb
+    # ports:
+    #   - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - finman-network
+
+  scraper:
+    build: ./scraper
+    container_name: finman-scraper
+    ipc: host
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      - PORT=3001
+      - BANK_RUT=${BANK_RUT}
+      - BANK_PASSWORD=${BANK_PASSWORD}
+    ports:
+      - "3001:3001"
+    networks:
+      - finman-network
+
+  frontend:
+    build: ./frontend
+    container_name: finman-frontend
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - DB_NAME=FinMan
+      - SCRAPER_URL=http://scraper:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+      - scraper
+    networks:
+      - finman-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  finman-network:
+    driver: bridge

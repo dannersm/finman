@@ -1,0 +1,25 @@
+{
+  "name": "finman-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Financial Manager with automated bank scraping",
+  "workspaces": [
+    "frontend",
+    "scraper"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=finman-frontend\" \"npm start --workspace=finman-scraper\"",
+    "install:all": "npm install",
+    "lint": "npm run lint --workspaces --if-present",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "prettier": "^3.2.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+.env
+.DS_Store
+.git/
+frontend/.next/
+frontend/node_modules/
+scraper/node_modules/
+scraper/test-results/
+scraper/playwright-report/
+tmp/
+.gemini/
+.aider*
