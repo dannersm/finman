@@ -14,6 +14,11 @@ export const formatCurrency = (amount) =>
 // Helper to safely parse date strings or Date objects
 const toDate = (date) => {
   if (typeof date === 'string') {
+    // Fix for timezone issues: treat ISO dates as local dates by ignoring time components
+    // This ensures that 2023-10-27T00:00:00Z is displayed as 27/10 regardless of local timezone
+    if (date.indexOf('T') > -1) {
+      return parseISO(date.split('T')[0]);
+    }
     return parseISO(date);
   }
   return date;
