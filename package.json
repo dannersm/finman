@@ -8,12 +8,14 @@
     "scraper"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=finman-frontend\" \"npm start --workspace=finman-scraper\"",
+    "dev": "npm run dev --workspace=finman-frontend & npm start --workspace=finman-scraper & wait",
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
     "prettier": "^3.2.5"
+  },
+  "overrides": {
+    "date-fns": "^3.6.0"
   },
   "engines": {
     "node": ">=20.0.0"
