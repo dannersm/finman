@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Container,
   Typography,
@@ -10,12 +10,14 @@ import {
   ToggleButtonGroup,
   IconButton,
   CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { es } from "date-fns/locale/es";
-import { BarChart, Label, Cached } from "@mui/icons-material";
+import { BarChart, Label, Cached, UploadFile } from "@mui/icons-material";
 
 import TransactionList from "@/components/TransactionList";
 import CategoryManager from "@/components/CategoryManager";
@@ -24,7 +26,7 @@ import CategoryChart from "@/components/CategoryChart";
 import MonthlySpendChart from "@/components/MonthlySpendChart";
 import ApplyCategoriesModal from "@/components/ApplyCategoriesModal";
 import TotalCard from "@/components/TotalCard";
-import { useTransactions, useUpdateTransactions } from "@/hooks/useTransactions";
+import { useTransactions, useUpdateTransactions, useImportStatement } from "@/hooks/useTransactions";
 
 export default function Home() {
   const [startDate, setStartDate] = useState(null);
@@ -32,10 +34,13 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [viewMode, setViewMode] = useState("analytics");
   const [isApplyCategoriesModalOpen, setIsApplyCategoriesModalOpen] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Initial fetch to get default date range if not set
   const { data: initialData } = useTransactions(null, null);
   const updateTransactionsMutation = useUpdateTransactions();
+  const importStatementMutation = useImportStatement();
 
   useEffect(() => {
     setIsClient(true);
@@ -66,6 +71,26 @@ export default function Home() {
       console.error('Failed to update transactions:', error);
     }
   }, [updateTransactionsMutation]);
+
+  const handleImportClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      const result = await importStatementMutation.mutateAsync(file);
+      setFeedback({
+        severity: "success",
+        message: `${result.message}: ${result.inserted} movimientos importados (${result.deleted} reemplazados).`,
+      });
+    } catch (error) {
+      setFeedback({ severity: "error", message: error.message });
+    }
+  }, [importStatementMutation]);
 
   const renderAnalyticsGrid = () => (
     <Grid container spacing={{ xs: 2, md: 4 }} alignItems="stretch">
@@ -186,12 +211,28 @@ export default function Home() {
                   <Label />
                 </ToggleButton>
               </ToggleButtonGroup>
-              <IconButton 
-                onClick={handleUpdateTransactions} 
+              <IconButton
+                onClick={handleUpdateTransactions}
                 disabled={updateTransactionsMutation.isPending}
                 size="small"
+                aria-label="actualizar movimientos"
               >
                 {updateTransactionsMutation.isPending ? <CircularProgress size={20} /> : <Cached />}
+              </IconButton>
+              <input
+                type="file"
+                accept="application/pdf"
+                ref={fileInputRef}
+                onChange={handleFileSelected}
+                style={{ display: "none" }}
+              />
+              <IconButton
+                onClick={handleImportClick}
+                disabled={importStatementMutation.isPending}
+                size="small"
+                aria-label="importar cartola PDF"
+              >
+                {importStatementMutation.isPending ? <CircularProgress size={20} /> : <UploadFile />}
               </IconButton>
             </Box>
           </Grid>
@@ -204,6 +245,21 @@ export default function Home() {
         open={isApplyCategoriesModalOpen}
         onClose={() => setIsApplyCategoriesModalOpen(false)}
       />
+      <Snackbar
+        open={!!feedback}
+        autoHideDuration={6000}
+        onClose={() => setFeedback(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setFeedback(null)}
+          severity={feedback?.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {feedback?.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

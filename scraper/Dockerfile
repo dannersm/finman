@@ -7,7 +7,7 @@ RUN npm ci
 
 RUN apt-get update && \
     npx playwright install firefox --with-deps && \
-    apt-get install -y xvfb xauth dbus-x11 && \
+    apt-get install -y xvfb xauth dbus-x11 poppler-utils && \
     rm -rf /var/lib/apt/lists/*
 
 RUN npm prune --production

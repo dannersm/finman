@@ -74,6 +74,21 @@ const updateTransactions = async () => {
       return response.json();
 }
 
+const importStatement = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch('/api/transactions/import', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo importar la cartola');
+  }
+  return data;
+};
+
 export const useTransactions = (startDate, endDate) => {
   return useQuery({
     queryKey: ['dashboard', { 
@@ -134,3 +149,13 @@ export const useUpdateTransactions = () => {
       },
     });
   };
+
+export const useImportStatement = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: importStatement,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+};
