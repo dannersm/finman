@@ -71,9 +71,10 @@ const checkLoginStatus = async (page) => {
   return isPrivate && !isPublic;
 };
 
-const formatDebitDate = (dateStr) => {
+const formatMovementDate = (dateStr) => {
   if (!dateStr || !dateStr.includes("/")) return dateStr;
-  
+  if (dateStr.split("/").length === 3) return dateStr; // already DD/MM/YYYY
+
   const now = new Date();
   const currentYear = now.getFullYear();
   const [day, month] = dateStr.split("/").map(Number);
@@ -150,12 +151,17 @@ export const scrape = async () => {
     console.log(`Found ${debitRows.length} debit account movements.`);
 
     return [
-      ...creditRows.map(r => ({ source: "CREDIT_CARD", bank: "Santander", ...r })),
+      ...creditRows.map(r => ({
+        source: "CREDIT_CARD",
+        bank: "Santander",
+        ...r,
+        date: formatMovementDate(r.date)
+      })),
       ...debitRows.map(r => ({
         source: "DEBIT_CARD",
         bank: "Santander",
         ...r,
-        date: formatDebitDate(r.date)
+        date: formatMovementDate(r.date)
       }))
     ];
 
