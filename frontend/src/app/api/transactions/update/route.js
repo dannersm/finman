@@ -9,7 +9,7 @@ const parseMovements = (movements) => {
       if (!movement.amount){
         continue
       }
-      const amount = parseFloat(movement.amount.replace('$', '').replace('.', '').replace('-', '')) 
+      const amount = parseFloat(movement.amount.replace('$', '').replace(/\./g, '').replace('-', ''))
       
       // Assuming the date is in DD/MM/YYYY format from the scraper
       const dateParts = movement.date.split('/');

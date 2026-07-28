@@ -1,4 +1,18 @@
 /**
+ * Normaliza un texto a minúsculas y sin tildes/diacríticos, para que
+ * comparaciones como "crédito" vs "credito" coincidan.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+/**
  * Clasifica un conjunto de transacciones basado en una lista de categorías.
  *
  * @param {Array<Object>} transactions - La lista de transacciones a clasificar.
@@ -14,7 +28,7 @@ export function classifyTransactions(transactions, categories) {
     let bestMatch = null;
     let longestMatchLength = 0;
 
-    const description = transaction.description ? transaction.description.toLowerCase() : '';
+    const description = transaction.description ? normalizeText(transaction.description) : '';
     const amount = transaction.amount;
 
     categories.forEach(category => {
@@ -27,7 +41,7 @@ export function classifyTransactions(transactions, categories) {
       }
 
       // Avoid terms check
-      const hasAvoidingTerm = category.avoidTerms && category.avoidTerms.some(term => term && description.includes(term.toLowerCase()));
+      const hasAvoidingTerm = category.avoidTerms && category.avoidTerms.some(term => term && description.includes(normalizeText(term)));
       if (hasAvoidingTerm) {
         return;
       }
@@ -36,10 +50,10 @@ export function classifyTransactions(transactions, categories) {
       if (category.matchTerms) {
         category.matchTerms.forEach(term => {
           if (term) {
-            const lowerCaseTerm = term.toLowerCase();
-            if (description.includes(lowerCaseTerm)) {
-              if (lowerCaseTerm.length > longestMatchLength) {
-                longestMatchLength = lowerCaseTerm.length;
+            const normalizedTerm = normalizeText(term);
+            if (description.includes(normalizedTerm)) {
+              if (normalizedTerm.length > longestMatchLength) {
+                longestMatchLength = normalizedTerm.length;
                 bestMatch = category._id;
               }
             }

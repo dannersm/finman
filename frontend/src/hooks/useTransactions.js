@@ -89,6 +89,21 @@ const importStatement = async (file) => {
   return data;
 };
 
+// Imports each file one after another, keeping going when one fails so a
+// single bad statement doesn't block the rest of the batch.
+const importStatements = async (files) => {
+  const results = [];
+  for (const file of files) {
+    try {
+      const data = await importStatement(file);
+      results.push({ file: file.name, success: true, data });
+    } catch (error) {
+      results.push({ file: file.name, success: false, error: error.message });
+    }
+  }
+  return results;
+};
+
 export const useTransactions = (startDate, endDate) => {
   return useQuery({
     queryKey: ['dashboard', { 
@@ -153,7 +168,7 @@ export const useUpdateTransactions = () => {
 export const useImportStatement = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: importStatement,
+    mutationFn: importStatements,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },

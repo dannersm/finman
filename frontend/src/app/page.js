@@ -77,19 +77,29 @@ export default function Home() {
   }, []);
 
   const handleFileSelected = useCallback(async (event) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
 
-    try {
-      const result = await importStatementMutation.mutateAsync(file);
-      setFeedback({
-        severity: "success",
-        message: `${result.message}: ${result.inserted} movimientos importados (${result.deleted} reemplazados).`,
-      });
-    } catch (error) {
-      setFeedback({ severity: "error", message: error.message });
+    const results = await importStatementMutation.mutateAsync(files);
+    const succeeded = results.filter((r) => r.success);
+    const failed = results.filter((r) => !r.success);
+    const inserted = succeeded.reduce((sum, r) => sum + (r.data.inserted || 0), 0);
+
+    const messageParts = [];
+    if (succeeded.length > 0) {
+      messageParts.push(`${succeeded.length} archivo(s) importados: ${inserted} movimientos importados.`);
     }
+    if (failed.length > 0) {
+      messageParts.push(
+        `${failed.length} archivo(s) con error: ${failed.map((r) => `${r.file} (${r.error})`).join(", ")}`
+      );
+    }
+
+    setFeedback({
+      severity: failed.length === 0 ? "success" : succeeded.length === 0 ? "error" : "warning",
+      message: messageParts.join(" "),
+    });
   }, [importStatementMutation]);
 
   const renderAnalyticsGrid = () => (
@@ -222,6 +232,7 @@ export default function Home() {
               <input
                 type="file"
                 accept="application/pdf"
+                multiple
                 ref={fileInputRef}
                 onChange={handleFileSelected}
                 style={{ display: "none" }}
