@@ -62,7 +62,7 @@ export function classifyTransactions(transactions, categories) {
       }
     });
 
-    return { ...transaction, category: bestMatch };
+    return { ...transaction, category: bestMatch ? String(bestMatch) : bestMatch };
   });
 }
 

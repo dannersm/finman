@@ -22,18 +22,47 @@ const CONFIG = {
   }
 };
 
+const MONTHS_ES = {
+  enero: '01', febrero: '02', marzo: '03', abril: '04', mayo: '05', junio: '06',
+  julio: '07', agosto: '08', septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12',
+};
+
+// Some tables (e.g. debit account movements) spell dates out for screen
+// readers as "7 de septiembre de 2026". That form carries the year, unlike
+// the visible "DD/MM" short form, so prefer it when available.
+const parseSpanishLongDate = (text) => {
+  if (!text) return null;
+  const match = text.trim().toLowerCase().match(/^(\d{1,2})\s+de\s+([a-záéíóúñ]+)\s+de\s+(\d{4})$/);
+  if (!match) return null;
+  const month = MONTHS_ES[match[2]];
+  if (!month) return null;
+  return `${match[1].padStart(2, '0')}/${month}/${match[3]}`;
+};
+
+// Date/amount cells on some tables render a visible span plus a
+// visually-hidden accessibility span spelling the same value out in words
+// right next to it (e.g. "-$12.350" + "menos doce mil trescientos cincuenta
+// pesos"). textContent() on the cell concatenates both, corrupting the
+// value, so pull the specific span instead.
+const getAccessibleText = async (cell, selector) => {
+  const el = cell.locator(selector).first();
+  if ((await el.count()) === 0) return null;
+  const text = await el.textContent();
+  return text ? text.trim() : null;
+};
+
 const extractPageTable = async (page) => {
   await page.waitForSelector(CONFIG.selectors.cell);
-  
+
   let previousCount = 0;
   let stableCount = 0;
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < CONFIG.timeouts.maxWait) {
     const currentCount = await page.locator(CONFIG.selectors.row).count();
     if (currentCount === previousCount && currentCount > 0) {
       stableCount++;
-      if (stableCount >= 4) break; 
+      if (stableCount >= 4) break;
     } else {
       stableCount = 0;
     }
@@ -48,9 +77,16 @@ const extractPageTable = async (page) => {
 
   for (let i = 0; i < count; i++) {
     const row = rowLocators.nth(i);
-    const date = (await row.locator("td").nth(0).textContent())?.trim();
+    const dateCell = row.locator("td").nth(0);
+    const amountCell = row.locator("td").nth(3);
+
     const description = (await row.locator("td").nth(2).textContent())?.trim();
-    const amount = (await row.locator("td").nth(3).textContent())?.trim();
+
+    const longDate = await getAccessibleText(dateCell, '.sr-only');
+    const shortDate = await getAccessibleText(dateCell, '[aria-hidden="true"]');
+    const date = parseSpanishLongDate(longDate) || shortDate || (await dateCell.textContent())?.trim();
+
+    const amount = (await getAccessibleText(amountCell, '[aria-hidden="true"]')) || (await amountCell.textContent())?.trim();
 
     if (date) lastDateSeen = date;
 

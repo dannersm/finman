@@ -50,6 +50,7 @@ export async function GET(request) {
     let filteredTransactions = formattedTransactions;
     if (startDate && endDate) {
       const start = new Date(startDate);
+      start.setUTCHours(0, 0, 0, 0);
       const end = new Date(endDate);
       end.setUTCHours(23, 59, 59, 999);
 

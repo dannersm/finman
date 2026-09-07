@@ -10,10 +10,17 @@ const parseMovements = (movements) => {
         continue
       }
       const amount = parseFloat(movement.amount.replace('$', '').replace(/\./g, '').replace('-', ''))
-      
+
       // Assuming the date is in DD/MM/YYYY format from the scraper
-      const dateParts = movement.date.split('/');
-      const isoDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+      const dateParts = movement.date ? movement.date.split('/') : [];
+      const isoDate = dateParts.length === 3
+        ? new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`)
+        : new Date(NaN);
+
+      if (Number.isNaN(isoDate.getTime())) {
+        console.warn(`Skipping movement with unparseable date: ${JSON.stringify(movement)}`);
+        continue;
+      }
 
       cleanMovements.push({
         date: isoDate,
