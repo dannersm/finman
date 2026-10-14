@@ -46,17 +46,21 @@ const detectStatementType = (text) => {
 const parseAmount = (str) => parseInt(str.replace(/\./g, ""), 10);
 
 // Each real movement line looks like:
-//   "<LUGAR?>   DD/MM/YYYY <DESCRIPCIÓN>   [<MONEDA> <MONTO ORIGEN>]   $ <MONTO>"
+//   "<LUGAR?>   DD/MM/YY[YY] <DESCRIPCIÓN>   [<MONEDA> <MONTO ORIGEN>]   $ <MONTO>"
+// The movement rows print a 2-digit year (DD/MM/YY); a 4-digit year is also
+// accepted since it appears elsewhere in the statement (period headers, etc).
 // Requiring exactly one space (then a non-space char) between the date and the
 // description excludes the "PAGAR HASTA ... $ <total>" recap line, whose date is
 // followed only by a long run of spaces before the amount.
-const CREDIT_CARD_ROW = /^.*?(\d{2}\/\d{2}\/\d{4})\s(\S.*?)\s{2,}.*\$\s*(-?[\d.,]+)\s*$/;
+const CREDIT_CARD_ROW = /^.*?(\d{2}\/\d{2}\/\d{2}(?:\d{2})?)\s(\S.*?)\s{2,}.*\$\s*(-?[\d.,]+)\s*$/;
+
+const normalizeYear = (yyyy) => (yyyy.length === 2 ? `20${yyyy}` : yyyy);
 
 const parseCreditCardMovements = (text) => {
   const movements = [];
   for (const rawLine of text.split("\n")) {
     const line = rawLine.replace(/\r$/, "");
-    if (!/\d{2}\/\d{2}\/\d{4}/.test(line) || !line.includes("$")) continue;
+    if (!/\d{2}\/\d{2}\/\d{2}(?:\d{2})?/.test(line) || !line.includes("$")) continue;
 
     const match = line.match(CREDIT_CARD_ROW);
     if (!match) continue;
@@ -67,7 +71,7 @@ const parseCreditCardMovements = (text) => {
 
     const [dd, mm, yyyy] = date.split("/");
     movements.push({
-      date: `${yyyy}-${mm}-${dd}`,
+      date: `${normalizeYear(yyyy)}-${mm}-${dd}`,
       description: description.trim(),
       amount,
     });
@@ -87,7 +91,34 @@ const DEBIT_ROW = /^(\d{2})\/(\d{2})\s+(.+)$/;
 // "CHEQUES Y OTROS CARGOS" / "DEPOSITOS Y OTROS ABONOS" / "SALDO" are printed as
 // fixed-width, right-aligned columns; classify each amount by where it ends on the line.
 const AMOUNT_TOKEN = /(?<!\S)-?\d{1,3}(?:\.\d{3})*(?!\S)/g;
-const CARGOS_COLUMN_END = 120;
+// A purely numeric column value (doc number, or an amount) — never real description text.
+const NUMERIC_COL = /^-?[\d.]+$/;
+
+// The exact column position where "CARGOS" amounts end drifts from cartola to
+// cartola (pdftotext's -layout mode approximates x-positions, and numeric
+// columns don't line up with the header's letter columns). Instead of a fixed
+// offset, find it per-document: collect where every amount on a movement line
+// ends, and look for the gap between the CARGOS cluster and the ABONOS/SALDO
+// cluster that follows it.
+const findCargosColumnEnd = (lines) => {
+  const ends = [];
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.trimStart().match(DEBIT_ROW)) continue;
+    let tokenMatch;
+    AMOUNT_TOKEN.lastIndex = 0;
+    while ((tokenMatch = AMOUNT_TOKEN.exec(line)) !== null) {
+      ends.push(tokenMatch.index + tokenMatch[0].length);
+    }
+  }
+  const uniqueEnds = [...new Set(ends)].sort((a, b) => a - b);
+  for (let i = 1; i < uniqueEnds.length; i++) {
+    if (uniqueEnds[i] - uniqueEnds[i - 1] > 10) {
+      return (uniqueEnds[i] + uniqueEnds[i - 1]) / 2;
+    }
+  }
+  return 120; // fallback if the document didn't yield a clear gap
+};
 
 const parseDebitAccountMovements = (text) => {
   const headerSection = text.split(/DETALLE DE MOVIMIENTOS/)[0];
@@ -104,17 +135,24 @@ const parseDebitAccountMovements = (text) => {
   // "Resumen de Comisiones" restates commission lines already present in the main
   // ledger above it (e.g. COM.MANTENCION PLAN) — drop it to avoid double-counting.
   const ledgerText = text.split(/Resumen de Comisiones/)[0];
+  const ledgerLines = ledgerText.split("\n");
+  const cargosColumnEnd = findCargosColumnEnd(ledgerLines);
 
   const movements = [];
-  for (const rawLine of ledgerText.split("\n")) {
+  for (const rawLine of ledgerLines) {
     const line = rawLine.replace(/\r$/, "");
     const match = line.trimStart().match(DEBIT_ROW);
     if (!match) continue;
 
     const [, dd, mm, rest] = match;
+    // Depending on how much the branch name fills its column, it may merge
+    // with the description into one whitespace-split chunk or stay separate
+    // (e.g. "O.Gerencia PAGO EN LINEA S.I.I." vs "CHICUREO   Gestoria..."). In
+    // both cases the doc number and amount columns are purely numeric, so
+    // dropping those and rejoining the rest reliably yields the description.
     const cols = rest.trim().split(/\s{2,}/).filter(Boolean);
     if (cols.length < 2) continue;
-    const description = cols[1];
+    const description = cols.filter((c) => !NUMERIC_COL.test(c)).join(" ").trim();
     if (!description) continue;
 
     let cargo = null;
@@ -122,7 +160,7 @@ const parseDebitAccountMovements = (text) => {
     AMOUNT_TOKEN.lastIndex = 0;
     while ((tokenMatch = AMOUNT_TOKEN.exec(line)) !== null) {
       const end = tokenMatch.index + tokenMatch[0].length;
-      if (end <= CARGOS_COLUMN_END) cargo = tokenMatch[0];
+      if (end <= cargosColumnEnd) cargo = tokenMatch[0];
     }
     if (!cargo) continue; // no charge on this row (deposit-only or informational row)
 
